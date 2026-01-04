@@ -784,14 +784,31 @@ public class SGBD {
             else return false; // Invalid operator
 
             String[] parts = cond.split(operator);
-            String colName = parts[0].trim();
-            String valStr = parts[1].trim();
+            String leftSide = parts[0].trim();
+            String rightSide = parts[1].trim();
 
+            // Determine which side is the column
+            String colName = leftSide;
+            String valStr = rightSide;
+            String actualOp = operator;
+            
             // Handle Aliases (e.g., s.C1 -> C1)
             if (colName.contains(".")) colName = colName.split("\\.")[1];
 
             int colIdx = relation.getColumnNames().indexOf(colName);
-            if (colIdx == -1) return false; // Column not found
+            
+            // If column not found on left, try right side (e.g., "10 > note")
+            if (colIdx == -1) {
+                colName = rightSide;
+                valStr = leftSide;
+                // Handle Aliases on right side
+                if (colName.contains(".")) colName = colName.split("\\.")[1];
+                colIdx = relation.getColumnNames().indexOf(colName);
+                if (colIdx == -1) return false; // Column not found on either side
+                
+                // Reverse the operator (10 > note becomes note < 10)
+                actualOp = reverseOperator(operator);
+            }
 
             String recVal = record.getValues().get(colIdx);
             String type = relation.getColumnTypes().get(colIdx).toLowerCase();
@@ -801,20 +818,32 @@ public class SGBD {
                 if (type.equals("int")) {
                     int v1 = Integer.parseInt(recVal);
                     int v2 = Integer.parseInt(valStr);
-                    if (!compareInt(v1, v2, operator)) return false;
+                    if (!compareInt(v1, v2, actualOp)) return false;
                 } else if (type.equals("float") || type.equals("real")) {
                     float v1 = Float.parseFloat(recVal);
                     float v2 = Float.parseFloat(valStr);
-                    if (!compareFloat(v1, v2, operator)) return false;
+                    if (!compareFloat(v1, v2, actualOp)) return false;
                 } else {
                     // String comparison
-                    if (!compareString(recVal, valStr.replace("\"", ""), operator)) return false;
+                    if (!compareString(recVal, valStr.replace("\"", ""), actualOp)) return false;
                 }
             } catch (Exception e) {
                 return false; // Error parsing types
             }
         }
         return true;
+    }
+
+    // Helper to reverse comparison operators
+    private String reverseOperator(String op) {
+        return switch (op) {
+            case "<" -> ">";
+            case ">" -> "<";
+            case "<=" -> ">=";
+            case ">=" -> "<=";
+            case "=", "<>" -> op; // These are symmetric
+            default -> op;
+        };
     }
 
     // Helper to remove surrounding quotes from strings
