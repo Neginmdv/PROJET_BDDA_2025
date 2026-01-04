@@ -398,7 +398,7 @@ public class Relation {
         }
     }
 
-// Updated to handle VARCHAR correctly
+// Updated to handle VARCHAR and CHAR correctly
     public void writeRecordToBuffer(Record rec, ByteBuffer bb, int offset) {
         bb.position(offset);
         for (int i = 0; i < columnTypes.size(); i++) {
@@ -411,8 +411,8 @@ public class Relation {
             else if (type.equals("float") || type.equals("real")) {
                 bb.putFloat(Float.parseFloat(value));
             } 
-            else if (type.startsWith("varchar") || type.equals("string")) {
-                // Calculate size dynamically based on type (e.g. varchar(3) -> 3 bytes)
+            else if (type.startsWith("varchar") || type.startsWith("char(") || type.equals("string")) {
+                // Calculate size dynamically based on type (e.g. varchar(3) -> 3 bytes, char(5) -> 5 bytes)
                 int maxLen = getTypeSize(type); 
                 byte[] strBytes = new byte[maxLen];
                 byte[] valBytes = value.getBytes();
@@ -423,7 +423,7 @@ public class Relation {
         }
     }
 
-    // Updated to handle VARCHAR correctly
+    // Updated to handle VARCHAR and CHAR correctly
     public void readFromBuffer(Record rec, ByteBuffer bb, int offset) {
         bb.position(offset);
         rec.getValues().clear();
@@ -436,7 +436,7 @@ public class Relation {
             else if (type.equals("float") || type.equals("real")) {
                 rec.addValue(String.valueOf(bb.getFloat()));
             } 
-            else if (type.startsWith("varchar") || type.equals("string")) {
+            else if (type.startsWith("varchar") || type.startsWith("char(") || type.equals("string")) {
                 // Use getTypeSize to know exactly how many bytes to read
                 int len = getTypeSize(type);
                 byte[] strBytes = new byte[len];
