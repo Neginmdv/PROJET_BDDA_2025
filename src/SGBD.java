@@ -787,48 +787,81 @@ public class SGBD {
             String leftSide = parts[0].trim();
             String rightSide = parts[1].trim();
 
-            // Determine which side is the column
-            String colName = leftSide;
-            String valStr = rightSide;
-            String actualOp = operator;
-            
-            // Handle Aliases (e.g., s.C1 -> C1)
-            if (colName.contains(".")) colName = colName.split("\\.")[1];
+            // Enlever les alias (e.g., r.C1 -> C1)
+            String leftCol = leftSide.contains(".") ? leftSide.split("\\.")[1] : leftSide;
+            String rightCol = rightSide.contains(".") ? rightSide.split("\\.")[1] : rightSide;
 
-            int colIdx = relation.getColumnNames().indexOf(colName);
-            
-            // If column not found on left, try right side (e.g., "10 > note")
-            if (colIdx == -1) {
-                colName = rightSide;
-                valStr = leftSide;
-                // Handle Aliases on right side
-                if (colName.contains(".")) colName = colName.split("\\.")[1];
-                colIdx = relation.getColumnNames().indexOf(colName);
-                if (colIdx == -1) return false; // Column not found on either side
+            // Vérifier si chaque côté est une colonne
+            int leftColIdx = relation.getColumnNames().indexOf(leftCol);
+            int rightColIdx = relation.getColumnNames().indexOf(rightCol);
+
+            // Cas 1: colonne op colonne (ex: r.C1 > r.C4)
+            if (leftColIdx != -1 && rightColIdx != -1) {
+                String val1 = record.getValues().get(leftColIdx);
+                String val2 = record.getValues().get(rightColIdx);
+                String type1 = relation.getColumnTypes().get(leftColIdx).toLowerCase();
                 
-                // Reverse the operator (10 > note becomes note < 10)
-                actualOp = reverseOperator(operator);
-            }
-
-            String recVal = record.getValues().get(colIdx);
-            String type = relation.getColumnTypes().get(colIdx).toLowerCase();
-
-            // Compare based on type
-            try {
-                if (type.equals("int")) {
-                    int v1 = Integer.parseInt(recVal);
-                    int v2 = Integer.parseInt(valStr);
-                    if (!compareInt(v1, v2, actualOp)) return false;
-                } else if (type.equals("float") || type.equals("real")) {
-                    float v1 = Float.parseFloat(recVal);
-                    float v2 = Float.parseFloat(valStr);
-                    if (!compareFloat(v1, v2, actualOp)) return false;
-                } else {
-                    // String comparison
-                    if (!compareString(recVal, valStr.replace("\"", ""), actualOp)) return false;
+                try {
+                    if (type1.equals("int")) {
+                        int v1 = Integer.parseInt(val1);
+                        int v2 = Integer.parseInt(val2);
+                        if (!compareInt(v1, v2, operator)) return false;
+                    } else if (type1.equals("float") || type1.equals("real")) {
+                        float v1 = Float.parseFloat(val1);
+                        float v2 = Float.parseFloat(val2);
+                        if (!compareFloat(v1, v2, operator)) return false;
+                    } else {
+                        if (!compareString(val1, val2, operator)) return false;
+                    }
+                } catch (Exception e) {
+                    return false;
                 }
-            } catch (Exception e) {
-                return false; // Error parsing types
+            }
+            // Cas 2: colonne op constante (ex: note > 10)
+            else if (leftColIdx != -1) {
+                String recVal = record.getValues().get(leftColIdx);
+                String type = relation.getColumnTypes().get(leftColIdx).toLowerCase();
+                
+                try {
+                    if (type.equals("int")) {
+                        int v1 = Integer.parseInt(recVal);
+                        int v2 = Integer.parseInt(rightSide);
+                        if (!compareInt(v1, v2, operator)) return false;
+                    } else if (type.equals("float") || type.equals("real")) {
+                        float v1 = Float.parseFloat(recVal);
+                        float v2 = Float.parseFloat(rightSide);
+                        if (!compareFloat(v1, v2, operator)) return false;
+                    } else {
+                        if (!compareString(recVal, rightSide.replace("\"", ""), operator)) return false;
+                    }
+                } catch (Exception e) {
+                    return false;
+                }
+            }
+            // Cas 3: constante op colonne (ex: 10 > note)
+            else if (rightColIdx != -1) {
+                String recVal = record.getValues().get(rightColIdx);
+                String type = relation.getColumnTypes().get(rightColIdx).toLowerCase();
+                String reversedOp = reverseOperator(operator);
+                
+                try {
+                    if (type.equals("int")) {
+                        int v1 = Integer.parseInt(recVal);
+                        int v2 = Integer.parseInt(leftSide);
+                        if (!compareInt(v1, v2, reversedOp)) return false;
+                    } else if (type.equals("float") || type.equals("real")) {
+                        float v1 = Float.parseFloat(recVal);
+                        float v2 = Float.parseFloat(leftSide);
+                        if (!compareFloat(v1, v2, reversedOp)) return false;
+                    } else {
+                        if (!compareString(recVal, leftSide.replace("\"", ""), reversedOp)) return false;
+                    }
+                } catch (Exception e) {
+                    return false;
+                }
+            }
+            else {
+                return false; // Aucune colonne trouvée
             }
         }
         return true;
